@@ -1,0 +1,66 @@
+---
+- name: Install python3, docker, dokcer-compose
+  hosts: docker_server
+  become: true
+  vars:
+    docker_compose_dir: /usr/local/lib/docker/cli-plugins
+  tasks:
+    - name: Make sure python3 and docker are installed
+      vars:
+        ansible_python_interpreter: /usr/bin/python
+      ansible.builtin.yum:
+        name:
+          - python3
+          - docker
+        update_cache: true
+        state: present
+    - name: Create directory for docker compose
+      ansible.builtin.file:
+        path: "{{ docker_compose_dir }}"
+        state: directory
+        recurse: true
+    - name: Install docker-compose
+      ansible.builtin.get_url:
+        url: https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-{{lookup('pipe', 'uname -s')}}-{{lookup('pipe', 'uname -m')}}
+        dest: "{{ docker_compose_dir }}/docker-compose"
+        mode: +x
+    - name: Ensure docker is running
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+    - name: Install docker python module
+      ansible.builtin.pip:
+        name:
+          - docker
+          - docker-compose
+
+- name: Add ec2-user to docker group
+  hosts: docker_server
+  become: true
+  tasks:
+    - name: Add ec2-user to docker group
+      ansible.builtin.user:
+        name: ec2-user
+        groups: docker
+        append: true
+    - name: Reconnect to server session
+      ansible.builtin.meta: reset_connection
+
+- name: Start docker container
+  hosts: docker_server
+  vars_files:
+    - project-vars
+  tasks:
+    - name: Copy docker compose
+      ansible.builtin.copy:
+        src: "{{ local_compose_file }}"
+        dest: /home/ec2-user/docker-compose.yaml
+    - name: Docker login
+      vars:
+        ansible_python_interpreter: /usr/bin/python
+      community.docker.docker_login:
+        username: "{{ docker_login }}"
+        password: "{{docker_password}}"
+    - name: Start container from compose
+      docker_compose.docker.docker_compose_v2:
+        project_src: /home/ec2-user

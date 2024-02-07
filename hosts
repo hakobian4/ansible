@@ -1,5 +1,0 @@
-[nexus_server]
-68.183.210.74 ansible_ssh_private_key_file=~/.ssh/myapp-server-key ansible_user=root
-
-[docker_server]
-35.180.188.25 ansible_ssh_private_key_file=~/.ssh/devops_classes_key ansible_user=ec2-user
